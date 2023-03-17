@@ -23,8 +23,20 @@ struct Run: AsyncParsableCommand {
   @Flag(help: "Force open a UI window, even when VNC is enabled.")
   var graphics: Bool = false
 
-  @Flag(help: "Boot into recovery mode") 
+  @Flag(help: "Boot into Recovery mode") 
   var recovery: Bool = false
+
+  @Flag(help: "Boot into DFU mode") 
+  var forceDFU: Bool = false
+
+  @Flag(help: "Halt when panicked") 
+  var stopOnPanic: Bool = false
+
+  @Flag(help: "Halt when loading iBootStage1") 
+  var stopInIBootStage1: Bool = false
+
+  @Flag(help: "Halt when loading iBootStage2") 
+  var stopInIBootStage2: Bool = false
 
   @Flag(help: ArgumentHelp(
     "Use screen sharing instead of the built-in UI.",
@@ -166,7 +178,15 @@ struct Run: AsyncParsableCommand {
           }
         }
 
-        try await vm!.run(recovery)
+        let startOptions = VMStartOptions(
+          startUpFromMacOSRecovery: recovery,
+          forceDFU: forceDFU,
+          stopOnPanic: stopOnPanic,
+          stopInIBootStage1: stopInIBootStage1,
+          stopInIBootStage2: stopInIBootStage2
+        )
+
+        try await vm!.run(startOptions)
 
         if let vncImpl = vncImpl {
           try vncImpl.stop()

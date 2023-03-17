@@ -17,6 +17,9 @@ struct Create: AsyncParsableCommand {
 
   @Option(help: ArgumentHelp("Disk size in Gb")) 
   var diskSize: UInt16 = 50
+    
+  @Option(help: ArgumentHelp("Path to custom ROM image (AVPBooter)"))
+  var romPath: String = "/System/Library/Frameworks/Virtualization.framework/Versions/A/Resources/AVPBooter.vmapple2.bin";
 
   func validate() throws {
     if fromIPSW == nil && !linux {
@@ -42,8 +45,11 @@ struct Create: AsyncParsableCommand {
         } else {
           ipswURL = URL(fileURLWithPath: fromIPSW)
         }
+        
+        let romURL = URL(fileURLWithPath: romPath)
+        print("romURL: \(romURL)")
 
-        _ = try await VM(vmDir: tmpVMDir, ipswURL: ipswURL, diskSizeGB: diskSize)
+        _ = try await VM(vmDir: tmpVMDir, ipswURL: ipswURL, diskSizeGB: diskSize, romURL: romURL)
       }
 
       if linux {
