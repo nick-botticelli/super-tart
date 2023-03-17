@@ -20,6 +20,11 @@ struct Run: AsyncParsableCommand {
     discussion: "Useful for integrating Tart VMs into other tools.\nUse `tart ip` in order to get an IP for SSHing or VNCing into the VM.")) 
   var noGraphics: Bool = false
 
+  @Flag(help: ArgumentHelp(
+    "Open serial console in /dev/ttySXX",
+    discussion: "Useful for debugging Linux Kernel"))
+  var serial: Bool = false
+
   @Flag(help: "Force open a UI window, even when VNC is enabled.")
   var graphics: Bool = false
 
@@ -134,7 +139,8 @@ struct Run: AsyncParsableCommand {
       vmDir: vmDir,
       network: userSpecifiedNetwork(vmDir: vmDir) ?? NetworkShared(),
       additionalDiskAttachments: additionalDiskAttachments,
-      directorySharingDevices: directoryShares() + rosettaDirectoryShare()
+      directorySharingDevices: directoryShares() + rosettaDirectoryShare(),
+      serial: serial
     )
 
     let vncImpl: VNC? = try {
@@ -377,7 +383,13 @@ struct Run: AsyncParsableCommand {
             VMView(vm: vm!).onAppear {
               NSWindow.allowsAutomaticWindowTabbing = false
             }.onDisappear {
-              NSApplication.shared.terminate(self)
+              let ret = kill(getpid(), SIGINT)
+              if ret != 0 {
+                // Fallback to the old termination method that doesn't
+                // propagate the cancellation to Task's in case graceful
+                // termination via kill(2) is not successful
+                NSApplication.shared.terminate(self)
+              }
             }
           }.frame(width: CGFloat(vm!.config.display.width), height: CGFloat(vm!.config.display.height))
         }.commands {
