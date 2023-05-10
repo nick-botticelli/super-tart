@@ -39,7 +39,7 @@ struct Run: AsyncParsableCommand {
   var recovery: Bool = false
 
   @Flag(help: "Boot into DFU mode") 
-  var forceDFU: Bool = false
+  var dfu: Bool = false
 
   @Flag(help: "Halt when panicked") 
   var stopOnPanic: Bool = false
@@ -211,7 +211,7 @@ struct Run: AsyncParsableCommand {
 
         let startOptions = VMStartOptions(
           startUpFromMacOSRecovery: recovery,
-          forceDFU: forceDFU,
+          forceDFU: dfu,
           stopOnPanic: stopOnPanic,
           stopInIBootStage1: stopInIBootStage1,
           stopInIBootStage2: stopInIBootStage2
