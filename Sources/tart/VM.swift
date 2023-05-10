@@ -42,7 +42,7 @@ class VM: NSObject, VZVirtualMachineDelegate, ObservableObject {
        network: Network = NetworkShared(),
        additionalDiskAttachments: [VZDiskImageStorageDeviceAttachment] = [],
        directorySharingDevices: [VZDirectorySharingDeviceConfiguration] = [],
-       serial: Bool = false
+       serialPorts: [VZSerialPortConfiguration] = []
   ) throws {
     name = vmDir.name
     config = try VMConfig.init(fromURL: vmDir.configURL)
@@ -57,7 +57,7 @@ class VM: NSObject, VZVirtualMachineDelegate, ObservableObject {
                                                     nvramURL: vmDir.nvramURL, romURL: vmDir.romURL, vmConfig: config,
                                                     network: network, additionalDiskAttachments: additionalDiskAttachments,
                                                     directorySharingDevices: directorySharingDevices,
-                                                    serial: serial
+                                                    serialPorts: serialPorts
     )
     virtualMachine = VZVirtualMachine(configuration: configuration)
 
@@ -137,7 +137,7 @@ class VM: NSObject, VZVirtualMachineDelegate, ObservableObject {
     network: Network = NetworkShared(),
     additionalDiskAttachments: [VZDiskImageStorageDeviceAttachment] = [],
     directorySharingDevices: [VZDirectorySharingDeviceConfiguration] = [],
-    serial: Bool = false
+    serialPorts: [VZSerialPortConfiguration] = []
   ) async throws {
     var ipswURL = ipswURL
 
@@ -188,7 +188,7 @@ class VM: NSObject, VZVirtualMachineDelegate, ObservableObject {
                                                     romURL: vmDir.romURL, vmConfig: config, network: network,
                                                     additionalDiskAttachments: additionalDiskAttachments,
                                                     directorySharingDevices: directorySharingDevices,
-                                                    serial: serial
+                                                    serialPorts: serialPorts
     )
     virtualMachine = VZVirtualMachine(configuration: configuration)
 
@@ -277,7 +277,7 @@ class VM: NSObject, VZVirtualMachineDelegate, ObservableObject {
     network: Network = NetworkShared(),
     additionalDiskAttachments: [VZDiskImageStorageDeviceAttachment],
     directorySharingDevices: [VZDirectorySharingDeviceConfiguration],
-    serial: Bool
+    serialPorts: [VZSerialPortConfiguration]
   ) throws -> VZVirtualMachineConfiguration {
     let configuration = VZVirtualMachineConfiguration()
 
@@ -291,7 +291,7 @@ class VM: NSObject, VZVirtualMachineDelegate, ObservableObject {
     configuration.memorySize = vmConfig.memorySize
 
     // Platform
-    configuration.platform = vmConfig.platform.platform(nvramURL: nvramURL)
+    configuration.platform = try vmConfig.platform.platform(nvramURL: nvramURL)
 
     // Display
     configuration.graphicsDevices = [vmConfig.platform.graphicsDevice(vmConfig: vmConfig)]
@@ -339,21 +339,7 @@ class VM: NSObject, VZVirtualMachineDelegate, ObservableObject {
     configuration.serialPorts = [serialPort]
 
     // Serial Port
-    if serial {
-      let tty_fd = createPTY()
-      if(tty_fd > -1){
-        let tty_read = FileHandle.init(fileDescriptor: tty_fd)
-        let tty_write = FileHandle.init(fileDescriptor: tty_fd)
-
-
-        configuration.serialPorts = [VZVirtioConsoleDeviceSerialPortConfiguration()]
-        let serialPortAttachment = VZFileHandleSerialPortAttachment(
-          fileHandleForReading: tty_read,
-          fileHandleForWriting: tty_write)
-
-        configuration.serialPorts[0].attachment = serialPortAttachment
-      }
-    }
+    configuration.serialPorts = serialPorts
 
     try configuration.validate()
 

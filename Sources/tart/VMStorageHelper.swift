@@ -41,6 +41,7 @@ extension Error {
 }
 
 enum RuntimeError : Error {
+  case VMConfigurationError(_ message: String)
   case VMDoesNotExist(name: String)
   case VMMissingFiles(_ message: String)
   case VMNotRunning(_ message: String)
@@ -56,6 +57,7 @@ enum RuntimeError : Error {
   case ExportFailed(_ message: String)
   case ImportFailed(_ message: String)
   case SoftnetFailed(_ message: String)
+  case OCIStorageError(_ message: String)
 }
 
 protocol HasExitCode {
@@ -65,6 +67,8 @@ protocol HasExitCode {
 extension RuntimeError : CustomStringConvertible {
   public var description: String {
     switch self {
+    case .VMConfigurationError(let message):
+      return message
     case .VMDoesNotExist(let name):
       return "the specified VM \"\(name)\" does not exist"
     case .VMMissingFiles(let message):
@@ -95,6 +99,8 @@ extension RuntimeError : CustomStringConvertible {
       return "VM import failed: \(message)"
     case .SoftnetFailed(let message):
       return "Softnet failed: \(message)"
+    case .OCIStorageError(let message):
+      return "OCI storage error: \(message)"
     }
   }
 }

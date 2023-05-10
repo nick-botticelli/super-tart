@@ -42,6 +42,7 @@ extra_css:
 
 plugins:
   - blog
+  - privacy
   - rss:
       match_path: blog/posts/.*
       date_from_meta:
@@ -87,9 +88,11 @@ nav:
   - "Quick Start": quick-start.md
   - "Integrations":
     - "GitHub Actions": integrations/github-actions.md
+    - "GitLab Runner": integrations/gitlab-runner.md
     - "Self-hosted CI": integrations/cirrus-cli.md
     - "Managing VMs": integrations/vm-management.md
-  - "Licensing": licensing.md
+  - "Support & Licensing": licensing.md
+  - "Orchestration": https://github.com/cirruslabs/orchard
   - "FAQ": faq.md
   - "Legal":
       - 'Terms of Service': legal/terms.md
