@@ -40,6 +40,11 @@ struct Run: AsyncParsableCommand {
 
   @Flag(help: "Boot into DFU mode") 
   var dfu: Bool = false
+    
+  @Flag(help: ArgumentHelp(
+    "Halt on fatal error",
+    discussion: "Requires host to be macOS 14.0 (Sonoma) or newer."))
+  var stopOnFatalError: Bool = false
 
   @Flag(help: "Halt when panicked") 
   var stopOnPanic: Bool = false
@@ -247,6 +252,7 @@ struct Run: AsyncParsableCommand {
         let startOptions = VMStartOptions(
           startUpFromMacOSRecovery: recovery,
           forceDFU: dfu,
+          stopOnFatalError: stopOnFatalError,
           stopOnPanic: stopOnPanic,
           stopInIBootStage1: stopInIBootStage1,
           stopInIBootStage2: stopInIBootStage2

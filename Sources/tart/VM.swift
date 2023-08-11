@@ -266,6 +266,10 @@ class VM: NSObject, VZVirtualMachineDelegate, ObservableObject {
       Dynamic(startOptions)._setPanicAction(vmStartOptions.stopOnPanic)
       Dynamic(startOptions)._setStopInIBootStage1(vmStartOptions.stopInIBootStage1)
       Dynamic(startOptions)._setStopInIBootStage2(vmStartOptions.stopInIBootStage2)
+        
+      if #available(macOS 14, *) {
+        Dynamic(startOptions)._setFatalErrorAction(vmStartOptions.stopOnFatalError)
+      }
 
       try await virtualMachine.start(options: startOptions)
     } else {
@@ -378,6 +382,12 @@ class VM: NSObject, VZVirtualMachineDelegate, ObservableObject {
       consoleDevice.ports[0] = consolePort
 
       configuration.consoleDevices.append(consoleDevice)
+    }
+      
+    // Panic device (needed on macOS 14+ when setPanicAction is enabled)
+    if #available(macOS 14, *) {
+      let panicDevice = Dynamic._VZPvPanicDeviceConfiguration()
+      Dynamic(configuration)._setPanicDevice(panicDevice)
     }
 
     try configuration.validate()
