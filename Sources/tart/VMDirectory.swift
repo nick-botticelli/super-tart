@@ -1,5 +1,6 @@
 import Foundation
 import Virtualization
+import CryptoKit
 
 struct VMDirectory: Prunable {
   var baseURL: URL
@@ -16,6 +17,9 @@ struct VMDirectory: Prunable {
   var romURL: URL {
     baseURL.appendingPathComponent("AVPBooter.vmapple2.bin")
   }
+  var stateURL: URL {
+    baseURL.appendingPathComponent("state.vzvmsave")
+  }
 
   var explicitlyPulledMark: URL {
     baseURL.appendingPathComponent(".explicitly-pulled")
@@ -30,13 +34,43 @@ struct VMDirectory: Prunable {
   }
 
   func running() throws -> Bool {
-    try PIDLock(lockURL: configURL).pid() != 0
+    // The most common reason why PIDLock() instantiation fails is a race with "tart delete" (ENOENT),
+    // which is fine to report as "not running".
+    //
+    // The other reasons are unlikely and the cost of getting a false positive is way less than
+    // the cost of crashing with an exception when calling "tart list" on a busy machine, for example.
+    guard let lock = try? PIDLock(lockURL: configURL) else {
+      return false
+    }
+
+    return try lock.pid() != 0
+  }
+
+  func state() throws -> String {
+    if try running() {
+      return "running"
+    } else if FileManager.default.fileExists(atPath: stateURL.path) {
+      return "suspended"
+    } else {
+      return "stopped"
+    }
   }
 
   static func temporary() throws -> VMDirectory {
     let tmpDir = try Config().tartTmpDir.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: false)
 
+    return VMDirectory(baseURL: tmpDir)
+  }
+
+  //Create tmp directory with hashing
+  static func temporaryDeterministic(key: String) throws -> VMDirectory {
+    let keyData = Data(key.utf8)
+    let hash = Insecure.MD5.hash(data: keyData)
+    // Convert hash to string
+    let hashString = hash.compactMap { String(format: "%02x", $0) }.joined()
+    let tmpDir = try Config().tartTmpDir.appendingPathComponent(hashString)
+    try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
     return VMDirectory(baseURL: tmpDir)
   }
 
@@ -74,6 +108,7 @@ struct VMDirectory: Prunable {
     try FileManager.default.copyItem(at: configURL, to: to.configURL)
     try FileManager.default.copyItem(at: nvramURL, to: to.nvramURL)
     try FileManager.default.copyItem(at: diskURL, to: to.diskURL)
+    try? FileManager.default.copyItem(at: stateURL, to: to.stateURL)
 
     // Re-generate MAC address
     if generateMAC {
@@ -89,6 +124,8 @@ struct VMDirectory: Prunable {
     var vmConfig = try VMConfig(fromURL: configURL)
 
     vmConfig.macAddress = VZMACAddress.randomLocallyAdministered()
+    // cleanup state if any
+    try? FileManager.default.removeItem(at: stateURL)
 
     try vmConfig.save(toURL: configURL)
   }

@@ -11,6 +11,19 @@ tart clone ghcr.io/cirruslabs/macos-ventura-base:latest ventura-base
 tart run ventura-base
 ```
 
+??? info "Manual installation from a release archive"
+    It's also possible to manually install `tart` binary from the latest released archive:
+    
+    ```bash
+    curl -LO https://github.com/cirruslabs/tart/releases/latest/download/tart.tar.gz
+    tar -xzvf tart.tar.gz
+    ./tart.app/Contents/MacOS/tart clone ghcr.io/cirruslabs/macos-ventura-base:latest ventura-base
+    ./tart.app/Contents/MacOS/tart run ventura-base
+    ```
+
+    Please note that `./tart.app/Contents/MacOS/tart` binary is required to be used in order to trick macOS
+    to pick `tart.app/Contents/embedded.provisionprofile` for elevated privileges that Tart needs.
+
 <p align="center">
   <img src="https://github.com/cirruslabs/tart/raw/main/Resources/TartScreenshot.png"/>
 </p>
@@ -20,7 +33,7 @@ tart run ventura-base
 If the guest VM is running and configured to accept incoming SSH connections you can conveniently connect to it like so:
 
 ```bash
-ssh admin@$(tart ip macos-monterey-base)
+ssh admin@$(tart ip macos-ventura-base)
 ```
 
 ## Mounting directories
@@ -56,6 +69,17 @@ All shared directories are automatically mounted to `/Volumes/My Shared Files` d
 The directory we've mounted above will be accessible from the `/Volumes/My Shared Files/project` path inside a guest VM.
 
 Note: to use the directory mounting feature, the guest VM needs to run macOS 13.0 (Ventura) or newer.
+
+??? tip "Changing mount location"
+    It is possible to remount the directories after a virtual machine is started by running the following commands:
+    
+    ```bash
+    sudo umount "/Volumes/My Shared Files"
+    mkdir ~/workspace
+    mount_virtiofs com.apple.virtio-fs.automount ~/workspace
+    ```
+
+    After running the above commands the direcory will be available at `~/workspace/project`
 
 ### Accessing mounted directories in Linux guests
 

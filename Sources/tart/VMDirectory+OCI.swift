@@ -148,7 +148,8 @@ extension VMDirectory {
     let manifest = OCIManifest(
       config: OCIManifestConfig(size: ociConfigJSON.count, digest: ociConfigDigest),
       layers: layers,
-      uncompressedDiskSize: UInt64(mappedDiskReadOffset)
+      uncompressedDiskSize: UInt64(mappedDiskReadOffset),
+      uploadDate: Date()
     )
 
     // Manifest
@@ -159,7 +160,7 @@ extension VMDirectory {
     }
 
     let pushedReference = Reference(digest: try manifest.digest())
-    return RemoteName(host: registry.baseURL.host!, namespace: registry.namespace, reference: pushedReference)
+    return RemoteName(host: registry.host!, namespace: registry.namespace, reference: pushedReference)
   }
 }
 

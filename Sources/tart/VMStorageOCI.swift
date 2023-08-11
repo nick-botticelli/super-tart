@@ -133,12 +133,22 @@ class VMStorageOCI: PrunableStorage {
   }
 
   func pull(_ name: RemoteName, registry: Registry) async throws {
+    SentrySDK.configureScope { scope in
+      scope.setContext(value: ["imageName": name], key: "OCI")
+    }
+
     defaultLogger.appendNewLine("pulling manifest...")
 
     let (manifest, manifestData) = try await registry.pullManifest(reference: name.reference.value)
 
     let digestName = RemoteName(host: name.host, namespace: name.namespace,
                                 reference: Reference(digest: Digest.hash(manifestData)))
+
+    if exists(name) && exists(digestName) && linked(from: name, to: digestName) {
+      // optimistically check if we need to do anything at all before locking
+      defaultLogger.appendNewLine("\(digestName) image is already cached and linked!")
+      return
+    }
 
     // Ensure that host directory for given RemoteName exists in OCI storage
     let hostDirectoryURL = hostDirectoryURL(digestName)
@@ -160,7 +170,7 @@ class VMStorageOCI: PrunableStorage {
 
     if !exists(digestName) {
       let transaction = SentrySDK.startTransaction(name: name.description, operation: "pull", bindToScope: true)
-      let tmpVMDir = try VMDirectory.temporary()
+      let tmpVMDir = try VMDirectory.temporaryDeterministic(key: name.description)
 
       // Lock the temporary VM directory to prevent it's garbage collection
       let tmpVMDirLock = try FileLock(lockURL: tmpVMDir.baseURL)
@@ -168,36 +178,13 @@ class VMStorageOCI: PrunableStorage {
 
       // Try to reclaim some cache space if we know the VM size in advance
       if let uncompressedDiskSize = manifest.uncompressedDiskSize() {
-        let requiredCapacityBytes = UInt64(uncompressedDiskSize + 128 * 1024 * 1024)
-
-        let attrs = try Config().tartCacheDir.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey, .volumeAvailableCapacityKey])
-        let capacityImportant = attrs.volumeAvailableCapacityForImportantUsage!
-        let capacityAvailable = attrs.volumeAvailableCapacity!
-        let availableCapacityBytes = max(UInt64(capacityImportant), UInt64(capacityAvailable))
-
-        if capacityImportant == 0 || capacityAvailable == 0 {
-          SentrySDK.capture(message: "Zero capacity") { scope in
-            scope.setLevel(.warning)
-
-            scope.setContext(value: [
-              "volumeAvailableCapacityForImportantUsageKey": capacityImportant,
-              "volumeAvailableCapacityKey": capacityAvailable,
-            ], key: "Attributes")
-          }
+        SentrySDK.configureScope { scope in
+          scope.setContext(value: ["imageUncompressedDiskSize": uncompressedDiskSize], key: "OCI")
         }
 
-        // There is a suspicious that occasionally capacity is returned as zero which can't be true.
-        // Let's validate to avoid unnecessary pruning.
-        if 0 < availableCapacityBytes && availableCapacityBytes < requiredCapacityBytes {
-          let transaction = SentrySDK.startTransaction(name: "Automatically Pruning Cache", operation: "prune", bindToScope: true)
-          transaction.setData(value: name, key: "name")
-          transaction.setData(value: uncompressedDiskSize, key: "uncompressedDiskSize")
-          transaction.setData(value: availableCapacityBytes, key: "availableCapacity")
-          transaction.setData(value: requiredCapacityBytes, key: "requiredCapacity")
-          defer { transaction.finish() }
+        let otherVMFilesSize: UInt64 = 128 * 1024 * 1024
 
-          try Prune.pruneReclaim(reclaimBytes: requiredCapacityBytes - availableCapacityBytes)
-        }
+        try Prune.reclaimIfNeeded(uncompressedDiskSize + otherVMFilesSize)
       }
 
       try await withTaskCancellationHandler(operation: {
@@ -219,6 +206,15 @@ class VMStorageOCI: PrunableStorage {
       // Ensure that images pulled by content digest
       // are excluded from garbage collection
       VMDirectory(baseURL: vmURL(name)).markExplicitlyPulled()
+    }
+  }
+
+  func linked(from: RemoteName, to: RemoteName) -> Bool {
+    do {
+      let resolvedFrom = try FileManager.default.destinationOfSymbolicLink(atPath: vmURL(from).path)
+      return resolvedFrom == vmURL(to).path
+    } catch {
+      return false
     }
   }
 

@@ -6,7 +6,7 @@ struct UnsupportedHostOSError: Error, CustomStringConvertible {
   }
 }
 
-struct Darwin: Platform {
+struct Darwin: PlatformSuspendable {
   var ecid: VZMacMachineIdentifier
   var hardwareModel: VZMacHardwareModel
 
@@ -98,13 +98,37 @@ struct Darwin: Platform {
     return result
   }
 
+  func keyboards() -> [VZKeyboardConfiguration] {
+    if #available(macOS 14, *) {
+      // Mac keyboard is only supported by guests starting with macOS Ventura
+      return [VZMacKeyboardConfiguration(), VZUSBKeyboardConfiguration()]
+    } else {
+      return [VZUSBKeyboardConfiguration()]
+    }
+  }
+
+  func keyboardsSuspendable() -> [VZKeyboardConfiguration] {
+    if #available(macOS 14, *) {
+      return [VZMacKeyboardConfiguration()]
+    } else {
+      return []
+    }
+  }
+
   func pointingDevices() -> [VZPointingDeviceConfiguration] {
     if #available(macOS 13, *) {
-      // Trackpad is only supported starting with macOS Ventura
-      // macOS Monterey will continue using a USB device == .darwin 
+      // Trackpad is only supported by guests starting with macOS Ventura
       return [VZMacTrackpadConfiguration(), VZUSBScreenCoordinatePointingDeviceConfiguration()]
     } else {
       return [VZUSBScreenCoordinatePointingDeviceConfiguration()]
+    }
+  }
+
+  func pointingDevicesSuspendable() -> [VZPointingDeviceConfiguration] {
+    if #available(macOS 13, *) {
+      return [VZMacTrackpadConfiguration()]
+    } else {
+      return []
     }
   }
 }

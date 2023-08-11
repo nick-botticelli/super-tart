@@ -1,8 +1,12 @@
 use_compute_credits: true
 
+env: 
+  XCODE_TAG: 15-beta-2
+
 task:
   name: Test on Ventura
   alias: test
+  use_compute_credits: $CIRRUS_USER_COLLABORATOR == 'true'
   persistent_worker:
     labels:
       name: dev-mini
@@ -27,8 +31,9 @@ task:
 task:
   name: Lint
   alias: lint
+  use_compute_credits: $CIRRUS_USER_COLLABORATOR == 'true'
   macos_instance:
-    image: ghcr.io/cirruslabs/macos-ventura-xcode:latest
+    image: ghcr.io/cirruslabs/macos-ventura-xcode:$XCODE_TAG
   lint_script:
     - swift package plugin --allow-writing-to-package-directory swiftformat --cache ignore --lint --report swiftformat.json .
   always:
@@ -37,24 +42,26 @@ task:
       format: swiftformat
 
 task:
+  only_if: $CIRRUS_TAG == ''
   name: Build
   alias: build
-  only_if: $CIRRUS_TAG == ''
+  use_compute_credits: $CIRRUS_USER_COLLABORATOR == 'true'
   macos_instance:
-    image: ghcr.io/cirruslabs/macos-ventura-xcode:latest
+    image: ghcr.io/cirruslabs/macos-ventura-xcode:$XCODE_TAG
   build_script: swift build --product tart
   sign_script: codesign --sign - --entitlements Resources/tart-dev.entitlements --force .build/debug/tart
   binary_artifacts:
     path: .build/debug/tart
 
 task:
-  name: Release (Dry Run)
   only_if: $CIRRUS_TAG == '' && ($CIRRUS_USER_PERMISSION == 'write' || $CIRRUS_USER_PERMISSION == 'admin')
+  name: Release (Dry Run)
   depends_on:
     - lint
     - build
+  use_compute_credits: $CIRRUS_USER_COLLABORATOR == 'true'
   macos_instance:
-    image: ghcr.io/cirruslabs/macos-ventura-xcode:latest
+    image: ghcr.io/cirruslabs/macos-ventura-xcode:$XCODE_TAG
   env:
     MACOS_CERTIFICATE: ENCRYPTED[552b9d275d1c2bdbc1bff778b104a8f9a53cbd0d59344d4b7f6d0ca3c811a5cefb97bef9ba0ef31c219cb07bdacdd2c2]
     AC_PASSWORD: ENCRYPTED[4a761023e7e06fe2eb350c8b6e8e7ca961af193cb9ba47605f25f1d353abc3142606f412e405be48fd897a78787ea8c2]
@@ -88,8 +95,9 @@ task:
     - lint
     - test
     - build
+  use_compute_credits: $CIRRUS_USER_COLLABORATOR == 'true'
   macos_instance:
-    image: ghcr.io/cirruslabs/macos-ventura-xcode:latest
+    image: ghcr.io/cirruslabs/macos-ventura-xcode:$XCODE_TAG
   env:
     MACOS_CERTIFICATE: ENCRYPTED[552b9d275d1c2bdbc1bff778b104a8f9a53cbd0d59344d4b7f6d0ca3c811a5cefb97bef9ba0ef31c219cb07bdacdd2c2]
     AC_PASSWORD: ENCRYPTED[4a761023e7e06fe2eb350c8b6e8e7ca961af193cb9ba47605f25f1d353abc3142606f412e405be48fd897a78787ea8c2]
@@ -120,9 +128,11 @@ task:
     # Generate and upload symbols
     - dsymutil tart
     - sentry-cli debug-files upload tart.dSYM/
+    - SENTRY_PROJECT=tart sentry-cli debug-files upload tart.dSYM/
     # Bundle and upload sources
     - sentry-cli debug-files bundle-sources tart.dSYM
     - sentry-cli debug-files upload tart.src.zip
+    - SENTRY_PROJECT=tart sentry-cli debug-files upload tart.src.zip
   create_sentry_release_script:
     - export SENTRY_RELEASE="tart@$CIRRUS_TAG"
     - sentry-cli releases new $SENTRY_RELEASE
@@ -132,6 +142,7 @@ task:
 task:
   name: Deploy Documentation
   only_if: $CIRRUS_BRANCH == 'main'
+  use_compute_credits: $CIRRUS_USER_COLLABORATOR == 'true'
   container:
     image: ghcr.io/cirruslabs/mkdocs-material-insiders:latest
     registry_config: ENCRYPTED[!cf1a0f25325aa75bad3ce6ebc890bc53eb0044c02efa70d8cefb83ba9766275a994b4831706c52630a0692b2fa9cfb9e!]
