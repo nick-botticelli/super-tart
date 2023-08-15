@@ -359,16 +359,19 @@ class VM: NSObject, VZVirtualMachineDelegate, ObservableObject {
     let debugStub = Dynamic._VZGDBDebugStubConfiguration(port: vmConfig.debugPort)
     Dynamic(configuration)._setDebugStub(debugStub)
 
-    // Serial console
-    let serialPort: VZSerialPortConfiguration = Dynamic._VZPL011SerialPortConfiguration().asObject as! VZSerialPortConfiguration
-    serialPort.attachment = VZFileHandleSerialPortAttachment(
-      fileHandleForReading: FileHandle.standardInput,
-      fileHandleForWriting: FileHandle.standardOutput
-    )
-    configuration.serialPorts = [serialPort]
-
-    // Serial Port
-    configuration.serialPorts = serialPorts
+    // Serial console; configure only if no prior serial ports are configured
+    if serialPorts.isEmpty {
+      // Configure internal Mac serial I/O
+      let serialPort: VZSerialPortConfiguration = Dynamic._VZPL011SerialPortConfiguration().asObject as! VZSerialPortConfiguration
+      serialPort.attachment = VZFileHandleSerialPortAttachment(
+        fileHandleForReading: FileHandle.standardInput,
+        fileHandleForWriting: FileHandle.standardOutput
+      )
+      configuration.serialPorts = [serialPort]
+    } else {
+      // Previously configured serial ports
+      configuration.serialPorts = serialPorts
+    }
 
     // Version console device
     //
@@ -383,7 +386,7 @@ class VM: NSObject, VZVirtualMachineDelegate, ObservableObject {
 
       configuration.consoleDevices.append(consoleDevice)
     }
-      
+
     // Panic device (needed on macOS 14+ when setPanicAction is enabled)
     if #available(macOS 14, *) {
       let panicDevice = Dynamic._VZPvPanicDeviceConfiguration()
